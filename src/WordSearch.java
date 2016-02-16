@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,47 +36,40 @@ public class WordSearch {
 		String[] fSplit = args[0].split(DELIMITER);
 		String[] wSplit = args[1].split(DELIMITER);
 		
-		HashMap<String, PrintThread> Group1 = new HashMap<String, PrintThread>();
-		LinkedList<ReadThread> Group2 = new LinkedList<ReadThread>();
+		HashMap<String, PrintThread> Group2 = new HashMap<String, PrintThread>();
+		LinkedList<ReadThread> Group1 = new LinkedList<ReadThread>();
 		
 		//Create a PrintThreads
 		for(String word : wSplit){
 			String lower = word.toLowerCase();
 			PrintThread temp = new PrintThread(lower);
 			temp.start();
-			Group1.put(lower,temp);
+			Group2.put(lower,temp);
 		}
 		
-		//ExecutorService executor = Executors.newFixedThreadPool(fSplit.length);
-		
-		try{
-			//Create ReadThreads
-			for(String file : fSplit){
-				String lower = file.toLowerCase();
-				ReadThread temp = new ReadThread(lower,Group1);
-				temp.start();
-				Group2.add(temp);
-				temp.join();
-			}
-		}
-		catch(Exception ex){
-			
-		}
-		
-		/*for(String file : fSplit){
+		//Create ReadThreads
+		for(String file : fSplit){
 			String lower = file.toLowerCase();
-			ReadThread temp = new ReadThread(lower,Group1);
-			executor.execute(temp);
-		}		
+			ReadThread temp = new ReadThread(lower,Group2);
+			temp.start();
+			Group1.add(temp);
+		}
+	
+		//Join the Threads
+		for(ReadThread th : Group1){
+			try {
+				th.join();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}			
+		}
 		
-		executor.shutdown();
-		
-		while(!executor.isTerminated()){
-			
-		}*/
-		System.out.println("\nFinished all threads");
-
-		System.exit(0);
+		//Exit the Threads
+		for(Entry<String, PrintThread> entry : Group2.entrySet()){
+			PrintThread th = entry.getValue();
+			th.terminate();
+		}
 	}
 	
 	public static void usage(){
@@ -155,24 +149,17 @@ class PrintThread extends Thread{
 	public void run() {
 		
 		//Keep looping forever!
-		while(running){
-			
-			//Get a lock on a queue
-			synchronized(queue){
-				
-				//If the queue is NOT empty - print
-				if(!queue.isEmpty()){
-					printMe();
-					queue.removeFirst();
-				}
+		while(running || !queue.isEmpty()){
+			//If the queue is NOT empty - print
+			if(!queue.isEmpty()){
+				printMe();
+				queue.removeFirst();
 			}
 		}
 	}
 	
 	public void addQueue(String file){
-		synchronized(queue){
-			queue.addLast(file);
-		}		
+		queue.addLast(file);	
 	}
 
 	public void printMe(){
