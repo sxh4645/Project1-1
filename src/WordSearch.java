@@ -8,6 +8,7 @@ import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 
 /**
@@ -139,6 +140,7 @@ class PrintThread extends Thread{
 	private volatile boolean running;
 	private String word;
 	private LinkedList<String> queue; //Use this for Queue Printing
+	private Semaphore queueSemaphore = new Semaphore(1);
 	
 	public PrintThread(String word){
 		this.word = word.toLowerCase(); // <-- always make sure the word is lowerCase
@@ -151,19 +153,30 @@ class PrintThread extends Thread{
 		//Keep looping forever!
 		while(running || !queue.isEmpty()){
 			//If the queue is NOT empty - print
-			if(!queue.isEmpty()){
-				printMe();
-				queue.removeFirst();
+			try {
+				queueSemaphore.acquire();
+				if(!queue.isEmpty()){
+					System.out.println(this.word + " " + queue.getFirst());
+					queue.removeFirst();
+				}				
+				queueSemaphore.release();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
+
 		}
 	}
 	
 	public void addQueue(String file){
-		queue.addLast(file);	
-	}
-
-	public void printMe(){
-		System.out.println(this.word + " " + queue.getFirst());
+		try {
+			queueSemaphore.acquire();
+			queue.addLast(file);	
+			queueSemaphore.release();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}		
 	}
 
 	public void terminate(){
