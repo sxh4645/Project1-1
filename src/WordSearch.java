@@ -1,38 +1,232 @@
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map.Entry;
 import java.util.Scanner;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
-
 
 /**
  * @author Shane Hare
- *
+ * @Project1-1 WordSearch
+ * 
  */
 public class WordSearch {
 
 	private static String DELIMITER = ","; 
 	
+	/*
+	 * Class ReadThread
+	 * Description:
+	 *     This class is designed to read the contents of a file and send a 
+	 *     print message to the PrintThread Class Asynchronously
+	 */
+	private static class ReadThread extends Thread{
+
+		private String file;						//File to Read From
+		private HashMap<String, PrintThread> map;	//Words Linked to PrintThreads
+		private HashSet<String> dictionary;			//Keep track of visited Words
+		
+		/*
+		 * Constructor
+		 */
+		public ReadThread(String file, HashMap<String, PrintThread> map){
+			this.file 		= file;
+			this.map 		= map;
+			this.dictionary = new HashSet<String>();
+		}
+		
+		/*
+		 * function run()
+		 * Description:
+		 *     Read through the given file and send the print message
+		 *     to the designated PrintThread
+		 */
+		public void run() {
+			
+			Scanner scan = null;
+			try{
+				File f = new File(this.file);
+				scan = new Scanner(f);
+				
+				//Loop through the Contents of the File
+				while(scan.hasNextLine()){
+					String line = scan.nextLine();
+					
+					String[] arr = line.split("[^a-zA-z]+");
+					
+					
+					for(String found : arr){
+						String word = found.toLowerCase();
+						
+						//If the word has not been found, print it
+						if(dictionary.add(word)){				
+							//System.out.println(word + " " + this.file);
+							if (map.containsKey(word)){
+								PrintThread th = map.get(word);
+								th.addQueue(this.file);
+							}
+						}
+					}				
+				}
+			}
+			catch(FileNotFoundException ex){
+				System.err.println(ex.getMessage());
+			}
+			catch(Exception ex){
+				System.err.println(ex.getMessage());
+			}
+		}	
+	}	
+	
+	/*
+	 * Class PrintThread
+	 * Description:
+	 *     This class is designed to take print a queue of Strings 
+	 *     where a word was found in what file.   
+	 */
+	private static class PrintThread extends Thread{
+		private volatile boolean running;
+		private String word;
+		private LinkedList<String> queue; //Use this for Queue Printing
+		
+		/*
+		 * Constructor
+		 */
+		public PrintThread(String word){
+			this.word 		= word.toLowerCase(); // <-- always make sure the word is lowerCase
+			this.queue 		= new LinkedList<String>();
+			this.running 	= true;
+		}
+		
+		/*
+		 * function run()
+		 * Description:
+		 *     Loop until the thread is terminated to see if you need
+		 *     to print the queue.
+		 */
+		public void run() {
+			//Keep looping forever until terminated!
+			while(running || !queue.isEmpty()){
+				print();
+			}
+		}
+		
+		/*
+		 * Function print()
+		 * Description:
+		 *     Print the queue and remove it.
+		 */
+		public synchronized void print(){
+			if (!queue.isEmpty()){
+				System.out.println(this.word + " " + queue.getFirst());
+				queue.removeFirst();			
+			}
+		}
+		
+		/*
+		 * function addQueue
+		 * Description:
+		 * 		Take in the file
+		 * @param file - Name of the file where the word came from
+		 */
+		public synchronized void addQueue(String file){
+			queue.addLast(file);	
+		}
+
+		/*
+		 * function terminate()
+		 * Description:
+		 *      Allows the thread to terminate gracefully if it 
+		 *      still has items in the queue to print
+		 */
+		public void terminate(){
+			this.running = false;
+		}
+	}	
+	
+	
+	/*
+	 * function usage()
+	 * Description:
+	 *     Used to print out a usage message to the user on Std.err
+	 */
+	public static void usage(){
+		System.err.println("Usage: java WordSearch <files> <words>");
+		System.err.println("       <files> - comma seperated list");
+		System.err.println("       <words> - comma seperated list");
+		System.exit(1);
+	}
+	
+	/*
+	 * function checkArgsFiles
+	 * Description:
+	 *     Check the parameters for the files provided by the user.
+	 *     If there is an error with finding a file, print usage
+	 *     
+	 */
+	public static void checkArgsFiles(String fileLine){
+		boolean cont = true;
+		
+		String[] arr = fileLine.split(DELIMITER);
+		
+		for(String file : arr){
+			File f = new File(file);
+			cont = cont && f.exists() && !f.isDirectory();
+			
+			//If File doesn't exist, print error message
+			if (!f.exists()) { System.err.println(file + " Does not exist."); }
+			
+			//If file is a directory print error message
+			else if (f.isDirectory()) { System.err.println(file + " is not a file, it is a directory"); }
+		}
+		
+		//If Errors were found in the files, exit
+		if(!cont) usage();
+	}
+	
+	/*
+	 * function checkArgsWords
+	 * Description:
+	 *     Check the parameters for the words provided by the user.
+	 *     If there is an error with a word not being only characters
+	 *     from the alphabet (English), print the error.
+	 *     
+	 */	
+	public static void checkArgsWords(String wordLine){
+		boolean cont = true;
+		
+		String[] arr = wordLine.split(DELIMITER);
+		
+		for(String word : arr){
+			//Regular Expression for a Word
+			if (!word.matches("[a-zA-Z]+")) { 
+				System.err.println(word + " is not a word."); 
+				cont = false;
+			}
+		}
+		
+		//If Errors were found in the files, exit
+		if(!cont) usage();
+	}	
+	
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		// TODO Auto-generated method stub
+		
+		args = new String[2];
+		//args[0] = "file1.txt,file2.txt,file3.txt,file4.txt";
+		args[0] = "file1.txt,file2.txt,file3.txt,file4.txt";
+		args[1] = "word,HEAVENS,God,void,DAMIT.FUCK";	
 		
 		/*if (args.length != 2){
 			//Call usage function
 			return;
 		}*/
 		
-		args = new String[2];
-		args[0] = "file1.txt,file2.txt";
-		args[1] = "word,HEAVENS,God,void";
+		checkArgsFiles(args[0]);
+		checkArgsWords(args[1]);
 		
 		String[] fSplit = args[0].split(DELIMITER);
 		String[] wSplit = args[1].split(DELIMITER);
@@ -71,115 +265,5 @@ public class WordSearch {
 			PrintThread th = entry.getValue();
 			th.terminate();
 		}
-	}
-	
-	public static void usage(){
-		// TODO - Generate Usage Message
-	}
-	
-	public static void argsErroneous(){
-		// TODO - Generate Usage Message for Erroneous Arguments
-	}
-
-}
-
-class ReadThread extends Thread{
-
-	private String file;
-	private HashMap<String, PrintThread> map;
-	private HashSet<String> dictionary;
-	
-	public ReadThread(String file, HashMap<String, PrintThread> map){
-		this.file = file;
-		this.map = map;
-		this.dictionary = new HashSet<String>();
-	}
-	
-	public void run() {
-		
-		Scanner scan = null;
-		try{
-			File f = new File(this.file);
-			scan = new Scanner(f);
-			
-			while(scan.hasNextLine()){
-				String line = scan.nextLine();
-				
-				Scanner words = new Scanner(line);
-				
-				while(words.hasNext()){
-					String word = words.next().toLowerCase();
-					
-					//If the word has not been found, print it
-					if(dictionary.add(word)){				
-						//System.out.println(word + " " + this.file);
-						if (map.containsKey(word)){
-							PrintThread th = map.get(word);
-							th.addQueue(this.file);
-						}
-					}
-				}
-				
-				words.close();
-				
-			}
-		}
-		catch(FileNotFoundException ex){
-			System.out.println(ex.getMessage());
-		}
-		catch(IOException ex){
-			System.out.println(ex.getMessage());
-		}
-		catch(Exception ex){
-			System.out.println(ex.getMessage());
-		}
-	}	
-}
-
-class PrintThread extends Thread{
-	private volatile boolean running;
-	private String word;
-	private LinkedList<String> queue; //Use this for Queue Printing
-	private Semaphore queueSemaphore = new Semaphore(1);
-	
-	public PrintThread(String word){
-		this.word = word.toLowerCase(); // <-- always make sure the word is lowerCase
-		this.queue = new LinkedList<String>();
-		this.running = true;
-	}
-
-	public void run() {
-		
-		//Keep looping forever!
-		while(running || !queue.isEmpty()){
-			//If the queue is NOT empty - print
-			try {
-				queueSemaphore.acquire();
-				if(!queue.isEmpty()){
-					System.out.println(this.word + " " + queue.getFirst());
-					queue.removeFirst();
-				}				
-				queueSemaphore.release();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-
-		}
-	}
-	
-	public void addQueue(String file){
-		try {
-			queueSemaphore.acquire();
-			queue.addLast(file);	
-			queueSemaphore.release();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}		
-	}
-
-	public void terminate(){
-		this.running = false;
 	}
 }
