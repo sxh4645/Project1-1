@@ -10,6 +10,12 @@ import java.util.Scanner;
  * @author Shane Hare
  * @Project1-1 WordSearch
  * 
+ * Description:
+ * 	   This java program is designed to create two sets of threads and allow
+ *     one set of threads to Read Files and the other set of threads to be
+ *     able to Print the words found that we determine without stopping
+ *     the Read Threads. We accomplish this by using Group1 and Group2 threads.
+ *     
  */
 public class WordSearch {
 
@@ -145,7 +151,6 @@ public class WordSearch {
 		}
 	}	
 	
-	
 	/*
 	 * function usage()
 	 * Description:
@@ -153,8 +158,8 @@ public class WordSearch {
 	 */
 	public static void usage(){
 		System.err.println("Usage: java WordSearch <files> <words>");
-		System.err.println("       <files> - comma seperated list");
-		System.err.println("       <words> - comma seperated list");
+		System.err.println("<files> - list of one or more text file names, separated by commas, with no whitespace.");
+		System.err.println("<words> - list of one or more target words, separated by commas, with no whitespace");
 		System.exit(1);
 	}
 	
@@ -215,16 +220,9 @@ public class WordSearch {
 	 */
 	public static void main(String[] args) {
 		
-		args = new String[2];
-		//args[0] = "file1.txt,file2.txt,file3.txt,file4.txt";
-		args[0] = "file1.txt,file2.txt,file3.txt,file4.txt";
-		args[1] = "word,HEAVENS,God,void,DAMIT.FUCK";	
+		if (args.length != 2){ usage(); }
 		
-		/*if (args.length != 2){
-			//Call usage function
-			return;
-		}*/
-		
+		//Check the Arguments to see if you can continue
 		checkArgsFiles(args[0]);
 		checkArgsWords(args[1]);
 		
@@ -232,9 +230,9 @@ public class WordSearch {
 		String[] wSplit = args[1].split(DELIMITER);
 		
 		HashMap<String, PrintThread> Group2 = new HashMap<String, PrintThread>();
-		LinkedList<ReadThread> Group1 = new LinkedList<ReadThread>();
+		LinkedList<ReadThread> Group1 		= new LinkedList<ReadThread>();
 		
-		//Create a PrintThreads
+		//Create a PrintThreads & start them
 		for(String word : wSplit){
 			String lower = word.toLowerCase();
 			PrintThread temp = new PrintThread(lower);
@@ -255,12 +253,11 @@ public class WordSearch {
 			try {
 				th.join();
 			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				System.err.println(e.getMessage());
 			}			
 		}
 		
-		//Exit the Threads
+		//Exit the PrintThreads Gracefully
 		for(Entry<String, PrintThread> entry : Group2.entrySet()){
 			PrintThread th = entry.getValue();
 			th.terminate();
